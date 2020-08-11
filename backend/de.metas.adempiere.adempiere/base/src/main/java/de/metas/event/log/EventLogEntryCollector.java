@@ -1,6 +1,7 @@
 package de.metas.event.log;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
 import javax.annotation.Nullable;
@@ -13,7 +14,6 @@ import org.slf4j.Logger;
 import com.google.common.annotations.VisibleForTesting;
 
 import de.metas.event.Event;
-import de.metas.event.log.EventLogUserService.EventLogEntryRequest;
 import de.metas.logging.LogManager;
 import de.metas.util.Check;
 import lombok.AccessLevel;
@@ -47,7 +47,8 @@ public class EventLogEntryCollector implements IAutoCloseable
 	private static final Logger logger = LogManager.getLogger(EventLogEntryCollector.class);
 	private static final ThreadLocal<EventLogEntryCollector> threadLocalCollector = new ThreadLocal<>();
 
-	@Getter
+	static final String PROPERTY_PROCESSED_BY_HANDLER_CLASS_NAMES = "EventStore_ProcessedByHandlerClassNames";
+
 	private final Event event;
 
 	@Getter(AccessLevel.PACKAGE)
@@ -81,17 +82,16 @@ public class EventLogEntryCollector implements IAutoCloseable
 		return eventLogCollector;
 	}
 
-	public void addEventLog(@NonNull final EventLogEntryRequest eventLogRequest)
+	public void addEventLog(@NonNull final EventLogEntryRequest request)
 	{
 		final EventLogEntry eventLogEntry = EventLogEntry.builder()
 				.uuid(event.getUuid())
-				.clientId(eventLogRequest.getClientId())
-				.orgId(eventLogRequest.getOrgId())
-				.processed(eventLogRequest.isProcessed())
-				.error(eventLogRequest.isError())
-				.adIssueId(eventLogRequest.getAdIssueId())
-				.message(eventLogRequest.getMessage())
-				.eventHandlerClass(eventLogRequest.getEventHandlerClass())
+				.clientAndOrgId(request.getClientAndOrgId())
+				.processed(request.isProcessed())
+				.error(request.isError())
+				.adIssueId(request.getAdIssueId())
+				.message(request.getMessage())
+				.eventHandlerClass(request.getEventHandlerClass())
 				.build();
 
 		eventLogEntries.add(eventLogEntry);
@@ -127,4 +127,13 @@ public class EventLogEntryCollector implements IAutoCloseable
 			logger.warn("Failed saving {}. Ignored", eventLogEntries, ex);
 		}
 	}
+
+	public boolean wasEventProcessedByHandler(@NonNull final Class<?> handlerClass)
+	{
+		final Collection<String> processedByHandlerClassNames = event.getProperty(PROPERTY_PROCESSED_BY_HANDLER_CLASS_NAMES);
+
+		return processedByHandlerClassNames != null
+				&& processedByHandlerClassNames.contains(handlerClass.getName());
+	}
+
 }

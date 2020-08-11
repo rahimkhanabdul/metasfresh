@@ -65,6 +65,7 @@ import de.metas.cache.CacheMgt;
 import de.metas.i18n.ILanguageDAO;
 import de.metas.i18n.Language;
 import de.metas.logging.LogManager;
+import de.metas.organization.ClientAndOrgId;
 import de.metas.organization.OrgId;
 import de.metas.security.IUserRolePermissions;
 import de.metas.security.IUserRolePermissionsDAO;
@@ -1178,7 +1179,7 @@ public final class Env
 		if (timestamp == null)
 		{
 			final Timestamp sysDate = SystemTime.asTimestamp();
-			if(!Adempiere.isUnitTestMode())
+			if (!Adempiere.isUnitTestMode())
 			{
 				// metas: tsa: added a dummy exception to be able to track it quickly
 				s_log.error("No value for '{}' or value '{}' could not be parsed. Returning system date: {}", context, timestampStr, sysDate, new Exception("StackTrace"));
@@ -1244,6 +1245,16 @@ public final class Env
 	public static void setOrgId(final Properties ctx, final OrgId orgId)
 	{
 		setContext(ctx, CTXNAME_AD_Org_ID, orgId.getRepoId());
+	}
+
+	public static ClientAndOrgId getClientAndOrgId()
+	{
+		return getClientAndOrgId(Env.getCtx());
+	}
+
+	public static ClientAndOrgId getClientAndOrgId(@NonNull final Properties ctx)
+	{
+		return ClientAndOrgId.ofClientAndOrg(getClientId(ctx), getOrgId(ctx));
 	}
 
 	/**

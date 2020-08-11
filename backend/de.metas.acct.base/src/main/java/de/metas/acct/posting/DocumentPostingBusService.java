@@ -144,7 +144,7 @@ public class DocumentPostingBusService
 			{
 				eventLogUserService.invokeHandlerAndLog(InvokeHandlerAndLogRequest.builder()
 						.handlerClass(handler.getClass())
-						.invokaction(() -> handler.handleRequest(request))
+						.invocation(() -> handler.handleRequest(request))
 						.build());
 			}
 		}

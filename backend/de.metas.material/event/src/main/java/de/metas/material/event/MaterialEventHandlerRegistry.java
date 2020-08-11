@@ -86,7 +86,7 @@ public class MaterialEventHandlerRegistry
 				@SuppressWarnings("unchecked")
 				final InvokeHandlerAndLogRequest request = InvokeHandlerAndLogRequest.builder()
 						.handlerClass(handler.getClass())
-						.invokaction(() -> handler.handleEvent(event))
+						.invocation(() -> handler.handleEvent(event))
 						.build();
 
 				eventLogUserService.invokeHandlerAndLog(request);

@@ -81,7 +81,7 @@ public class EventLogService
 
 		return eventFromStoredString.toBuilder()
 				.putPropertyFromObject(
-						EventLogUserService.PROPERTY_PROCESSED_BY_HANDLER_CLASS_NAMES,
+						EventLogEntryCollector.PROPERTY_PROCESSED_BY_HANDLER_CLASS_NAMES,
 						processedHandlers)
 				.wasLogged() // the event was logged; otherwise we would not be able to load it
 				.build();

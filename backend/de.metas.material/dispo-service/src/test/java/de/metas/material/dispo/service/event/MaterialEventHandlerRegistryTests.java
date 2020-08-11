@@ -170,7 +170,7 @@ public class MaterialEventHandlerRegistryTests
 	{
 		Mockito.doAnswer(invocation -> {
 			final InvokeHandlerAndLogRequest request = (InvokeHandlerAndLogRequest)invocation.getArguments()[0];
-			request.getInvokaction().run();
+			request.getInvocation().run();
 			return null; // void
 		})
 				.when(eventLogUserService)

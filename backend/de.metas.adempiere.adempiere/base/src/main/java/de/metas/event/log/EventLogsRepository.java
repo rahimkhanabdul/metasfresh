@@ -1,18 +1,13 @@
 package de.metas.event.log;
 
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
-import de.metas.cache.CCache;
-import de.metas.error.AdIssueId;
-import de.metas.event.model.I_AD_EventLog;
-import de.metas.event.model.I_AD_EventLog_Entry;
-import de.metas.logging.LogManager;
-import de.metas.util.GuavaCollectors;
-import de.metas.util.NumberUtils;
-import de.metas.util.Services;
-import de.metas.util.StringUtils;
-import de.metas.util.time.SystemTime;
-import lombok.NonNull;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
+import java.time.ZonedDateTime;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.UUID;
+
 import org.adempiere.ad.dao.IQueryBL;
 import org.adempiere.ad.trx.api.ITrx;
 import org.adempiere.exceptions.AdempiereException;
@@ -22,17 +17,21 @@ import org.compiere.util.Env;
 import org.slf4j.Logger;
 import org.springframework.stereotype.Repository;
 
-import java.sql.PreparedStatement;
-import java.sql.SQLException;
-import java.sql.Timestamp;
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.UUID;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 
-import static org.adempiere.model.InterfaceWrapperHelper.loadByRepoIdAwaresOutOfTrx;
-import static org.adempiere.model.InterfaceWrapperHelper.saveRecord;
+import de.metas.cache.CCache;
+import de.metas.error.AdIssueId;
+import de.metas.event.model.I_AD_EventLog;
+import de.metas.event.model.I_AD_EventLog_Entry;
+import de.metas.logging.LogManager;
+import de.metas.user.UserId;
+import de.metas.util.GuavaCollectors;
+import de.metas.util.NumberUtils;
+import de.metas.util.Services;
+import de.metas.util.StringUtils;
+import de.metas.util.time.SystemTime;
+import lombok.NonNull;
 
 /*
  * #%L
@@ -89,7 +88,7 @@ public class EventLogsRepository
 	@NonNull
 	private Set<EventLogId> insertEventLogIds(@NonNull final Collection<EventLogEntry> logEntries)
 	{
-		final Set<EventLogId> eventLogsWithError = new HashSet<>();
+		final HashSet<EventLogId> eventLogsWithError = new HashSet<>();
 
 		final String sql = "INSERT INTO " + I_AD_EventLog_Entry.Table_Name + "("
 				+ I_AD_EventLog_Entry.COLUMNNAME_AD_Client_ID + ","  // 1
@@ -130,30 +129,30 @@ public class EventLogsRepository
 			// NOTE: always create the logs out of transaction because we want them to be persisted even if the workpackage processing fails
 			pstmt = DB.prepareStatement(sql, ITrx.TRXNAME_None);
 
-			final Timestamp timestamp = SystemTime.asTimestamp();
-			final int ad_user_id = Env.getAD_User_ID();
+			final ZonedDateTime timestamp = SystemTime.asZonedDateTime();
+			final UserId userId = Env.getLoggedUserIdIfExists().orElse(null);
 
 			for (final EventLogEntry logEntry : logEntries)
 			{
 				final EventLogId eventLogId = getEventLogIdUsingCacheOutOfTrx(logEntry.getUuid());
 
-				final Object[] params = {
-						logEntry.getClientId(), // 1 - AD_Client_ID
-						logEntry.getOrgId(), // 2 - AD_Org_ID
+				final Object[] sqlParams = {
+						logEntry.getClientAndOrgId().getClientId(), // 1 - AD_Client_ID
+						logEntry.getClientAndOrgId().getOrgId(), // 2 - AD_Org_ID
 						eventLogId.getRepoId(), // 3 - AD_EventLog_ID
 						// + DB.TO_TABLESEQUENCE_NEXTVAL(I_AD_EventLog_Entry.Table_Name) + "," // 4 - AD_EventLog_Entry_ID
 						AdIssueId.toRepoId(logEntry.getAdIssueId()), // 5 - AD_Issue_ID
 						timestamp, // 6 - Created
-						ad_user_id, // 7 - CreatedBy
+						userId, // 7 - CreatedBy
 						// + "'Y'," // 8 - IsActive
 						StringUtils.ofBoolean(logEntry.isError(), "N"), // 9 - IsError
 						StringUtils.ofBoolean(logEntry.isProcessed(), "N"), // 10 - Processed
 						logEntry.getMessage(), // 11 - MsgText
 						logEntry.getEventHandlerClassName(), // 12 - Classname
 						timestamp, // 9 - Updated
-						ad_user_id // 10 - UpdatedBy
+						userId // 10 - UpdatedBy
 				};
-				DB.setParameters(pstmt, params);
+				DB.setParameters(pstmt, sqlParams);
 				pstmt.addBatch();
 
 				if (logEntry.isError())

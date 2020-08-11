@@ -1,21 +1,13 @@
 package de.metas.event.log;
 
-import java.util.Collection;
-
-import javax.annotation.Nullable;
-
 import org.adempiere.util.lang.IAutoCloseable;
-import org.compiere.util.Env;
 import org.springframework.stereotype.Service;
-
-import com.google.common.annotations.VisibleForTesting;
 
 import de.metas.error.AdIssueId;
 import de.metas.error.IErrorManager;
 import de.metas.util.ILoggable;
 import de.metas.util.Loggables;
 import de.metas.util.Services;
-import de.metas.util.StringUtils;
 import lombok.Builder;
 import lombok.Builder.Default;
 import lombok.NonNull;
@@ -52,52 +44,7 @@ import lombok.Value;
 @Service
 public class EventLogUserService
 {
-	@VisibleForTesting
-	static final String PROPERTY_PROCESSED_BY_HANDLER_CLASS_NAMES = "EventStore_ProcessedByHandlerClassNames";
-
-	@Value
-	public static class EventLogEntryRequest
-	{
-		boolean processed;
-		boolean error;
-		AdIssueId adIssueId;
-		String message;
-		Class<?> eventHandlerClass;
-
-		private int clientId;
-		private int orgId;
-
-		@Builder(buildMethodName = "createAndStore")
-		public EventLogEntryRequest(
-				final boolean processed,
-				final boolean error,
-				final AdIssueId adIssueId,
-				@Nullable final String message, Class<?> eventHandlerClass)
-		{
-			this.processed = processed;
-			this.error = error;
-			this.adIssueId = adIssueId;
-			this.message = message;
-			this.eventHandlerClass = eventHandlerClass;
-
-			this.clientId = Env.getAD_Client_ID(Env.getCtx());
-			this.orgId = Env.getAD_Org_ID(Env.getCtx());
-
-			final EventLogEntryCollector eventLogCollector = EventLogEntryCollector.getThreadLocal();
-			eventLogCollector.addEventLog(this);
-		}
-
-		public static class EventLogEntryRequestBuilder
-		{
-			public EventLogEntryRequestBuilder formattedMessage(
-					@NonNull final String message,
-					@Nullable final Object... params)
-			{
-				message(StringUtils.formatMessage(message, params));
-				return this;
-			}
-		}
-	}
+	private final IErrorManager errorManager = Services.get(IErrorManager.class);
 
 	/**
 	 * Creates a builder to log a message to the current event processing log.
@@ -125,7 +72,7 @@ public class EventLogUserService
 			@NonNull final Class<?> handlerClass,
 			@NonNull final Exception e)
 	{
-		final AdIssueId issueId = Services.get(IErrorManager.class).createIssue(e);
+		final AdIssueId issueId = errorManager.createIssue(e);
 
 		return EventLogEntryRequest.builder()
 				.error(true)
@@ -142,7 +89,7 @@ public class EventLogUserService
 		Class<?> handlerClass;
 
 		@NonNull
-		Runnable invokaction;
+		Runnable invocation;
 
 		@Default
 		boolean onlyIfNotAlreadyProcessed = true;
@@ -161,7 +108,7 @@ public class EventLogUserService
 
 		try (final IAutoCloseable loggable = EventLogLoggable.createAndRegisterThreadLocal(request.getHandlerClass()))
 		{
-			request.getInvokaction().run();
+			request.getInvocation().run();
 
 			newLogEntry(request.getHandlerClass())
 					.formattedMessage("this handler is done")
@@ -179,12 +126,7 @@ public class EventLogUserService
 
 	private boolean wasEventProcessedByHandler(@NonNull final Class<?> handlerClass)
 	{
-		final EventLogEntryCollector eventLogCollector = EventLogEntryCollector.getThreadLocal();
-
-		final Collection<String> processedByHandlerClassNames = eventLogCollector.getEvent()
-				.getProperty(PROPERTY_PROCESSED_BY_HANDLER_CLASS_NAMES);
-
-		return processedByHandlerClassNames != null
-				&& processedByHandlerClassNames.contains(handlerClass.getName());
+		return EventLogEntryCollector.getThreadLocal()
+				.wasEventProcessedByHandler(handlerClass);
 	}
 }

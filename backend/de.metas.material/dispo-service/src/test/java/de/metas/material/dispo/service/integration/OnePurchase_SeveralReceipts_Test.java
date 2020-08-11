@@ -140,7 +140,7 @@ public class OnePurchase_SeveralReceipts_Test
 		final EventLogUserService eventLogUserService = Mockito.spy(EventLogUserService.class);
 		Mockito.doAnswer(invocation -> {
 			final InvokeHandlerAndLogRequest request = (InvokeHandlerAndLogRequest)invocation.getArguments()[0];
-			request.getInvokaction().run();
+			request.getInvocation().run();
 			return null; // void
 		})
 				.when(eventLogUserService)

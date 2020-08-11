@@ -1,12 +1,9 @@
 package de.metas.event.log;
 
-import static org.assertj.core.api.Assertions.anyOf;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 import java.time.Instant;
-import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
@@ -15,10 +12,7 @@ import org.adempiere.model.InterfaceWrapperHelper;
 import org.adempiere.test.AdempiereTestHelper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Matchers;
 import org.mockito.Mockito;
-
-import com.google.common.collect.ImmutableList;
 
 import de.metas.event.Event;
 import de.metas.event.IEventBus;
@@ -129,22 +123,21 @@ public class EventLogServiceTest
 		final List<I_AD_EventLog> eventLogRecords = pojoLookupMap.getRecords(I_AD_EventLog.class);
 		assertThat(eventLogRecords).hasSize(1);
 
-		assertThat( EventLogId.ofRepoId(eventLogRecords.get(0).getAD_EventLog_ID())).isEqualTo(eventLogId);
+		assertThat(EventLogId.ofRepoId(eventLogRecords.get(0).getAD_EventLog_ID())).isEqualTo(eventLogId);
 
 		final Event loadedEvent = eventLogService.loadEventForReposting(eventLogId);
-		final List<Object> processedbyHandlerInfo = loadedEvent.getProperty(EventLogUserService.PROPERTY_PROCESSED_BY_HANDLER_CLASS_NAMES);
-		assertThat(processedbyHandlerInfo).isNotNull();
-		assertThat(processedbyHandlerInfo).isInstanceOf(List.class);
-		assertThat((List)processedbyHandlerInfo).containsOnly(String.class.getName());
+		final List<Object> processedByHandlerInfo = loadedEvent.getProperty(EventLogEntryCollector.PROPERTY_PROCESSED_BY_HANDLER_CLASS_NAMES);
+		assertThat(processedByHandlerInfo).isNotNull();
+		assertThat(processedByHandlerInfo).isInstanceOf(List.class);
+		assertThat(processedByHandlerInfo).containsOnly(String.class.getName());
 	}
 
-	private Event createSimpleEvent()
+	private static Event createSimpleEvent()
 	{
-		final Event event = Event.builder()
+		return Event.builder()
 				.setUUID(UUID.fromString("5fc6dbeb-aee4-4ac7-89ca-d31ff50d6421"))
 				.setWhen(Instant.ofEpochSecond(1514876894, 521000000))
 				.setSenderId("testSenderId")
 				.build();
-		return event;
 	}
 }
