@@ -49,7 +49,7 @@ import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.rules.TestWatcher;
 
-import de.metas.acct.api.IPostingService;
+import de.metas.acct.api.impl.PostingService;
 import de.metas.currency.CurrencyCode;
 import de.metas.currency.impl.PlainCurrencyDAO;
 import de.metas.document.IDocumentLocationBL;
@@ -108,7 +108,7 @@ public class DunningTestBase
 		AdempiereTestHelper.get().init();
 		POJOLookupMap.get().setCopyOnSave(true); // FIXME : Adapt dunning tests to new behavior
 
-		Services.get(ISysConfigBL.class).setValue(IPostingService.SYSCONFIG_Enabled, false, ClientId.SYSTEM, OrgId.ANY);
+		Services.get(ISysConfigBL.class).setValue(PostingService.SYSCONFIG_Enabled, false, ClientId.SYSTEM, OrgId.ANY);
 
 		dao = new PlainDunningDAO();
 		Services.registerService(IDunningDAO.class, dao);

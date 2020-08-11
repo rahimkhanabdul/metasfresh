@@ -49,8 +49,6 @@ import de.metas.acct.api.IPostingService;
 import de.metas.acct.doc.AcctDocRegistry;
 import de.metas.acct.posting.DocumentPostRequest;
 import de.metas.acct.posting.DocumentPostingBusService;
-import de.metas.adempiere.form.IClientUI;
-import de.metas.adempiere.form.IClientUIInvoker;
 import de.metas.event.Topic;
 import de.metas.logging.LogManager;
 import de.metas.notification.INotificationBL;
@@ -87,14 +85,6 @@ import lombok.ToString;
 	// Status
 	private boolean _executed = false;
 	private AdempiereException _postedException = null;
-
-	@Override
-	public IClientUIInvoker postItOnUI()
-	{
-		return Services.get(IClientUI.class)
-				.invoke()
-				.setRunnable(this::postIt);
-	}
 
 	@Override
 	public final void postIt()
@@ -354,14 +344,15 @@ import lombok.ToString;
 	private final void postingComplete()
 	{
 		final AdempiereException postedException = _postedException;
+		final UserId onErrorNotifyUserId = getOnErrorNotifyUserId();
 
 		//
 		// Notify user
-		if (getOnErrorNotifyUserId() != null && postedException != null)
+		if (onErrorNotifyUserId != null && postedException != null)
 		{
 			final UserNotificationRequest notification = UserNotificationRequest.builder()
 					.topic(NOTIFICATIONS_TOPIC)
-					.recipientUserId(getOnErrorNotifyUserId())
+					.recipientUserId(onErrorNotifyUserId)
 					.contentPlain(postedException.getLocalizedMessage())
 					.targetAction(TargetRecordAction.of(getDocumentRef()))
 					.build();

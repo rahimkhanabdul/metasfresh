@@ -37,11 +37,11 @@ import de.metas.util.Services;
 
 @Component
 @Profile(Profiles.PROFILE_AccountingService)
-public class AccountingService implements DocumentPostRequestHandler
+class AccountingServer implements DocumentPostRequestHandler
 {
-	private static final Logger logger = LogManager.getLogger(AccountingService.class);
+	private static final Logger logger = LogManager.getLogger(AccountingServer.class);
 
-	public AccountingService(final AcctDocRegistry acctDocFactory)
+	public AccountingServer(final AcctDocRegistry acctDocFactory)
 	{
 	}
 

@@ -47,13 +47,6 @@ public interface IPostingRequestBuilder
 	}
 
 	/**
-	 * Post it on UI
-	 * 
-	 * @return the Client UI invoker which when {@link IClientUIInvoker#invoke())ed will call #postIt().
-	 */
-	IClientUIInvoker postItOnUI();
-
-	/**
 	 * Post the document (i.e. execute this request).
 	 */
 	void postIt();

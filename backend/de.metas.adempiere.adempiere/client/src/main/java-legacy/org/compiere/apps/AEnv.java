@@ -69,8 +69,10 @@ import org.compiere.util.Ini;
 import org.compiere.util.SwingUtils;
 import org.slf4j.Logger;
 
+import de.metas.acct.api.IPostingRequestBuilder;
 import de.metas.acct.api.IPostingRequestBuilder.PostImmediate;
 import de.metas.acct.api.IPostingService;
+import de.metas.adempiere.form.IClientUI;
 import de.metas.adempiere.form.IClientUIInvoker.OnFail;
 import de.metas.cache.CCache;
 import de.metas.document.references.RecordZoomWindowFinder;
@@ -262,7 +264,7 @@ public final class AEnv
 		int y = (sSize.height - wSize.height) / 2;
 		if (position == SwingConstants.CENTER)
 		{
-			
+
 		}
 		else if (position == SwingConstants.NORTH_WEST)
 		{
@@ -954,16 +956,19 @@ public final class AEnv
 	public static void postImmediate(final int WindowNo, final int AD_Client_ID,
 			final int AD_Table_ID, final int Record_ID, final boolean force)
 	{
-		Services.get(IPostingService.class)
+		final IPostingRequestBuilder postingRequestBuilder = Services.get(IPostingService.class)
 				.newPostingRequest()
 				.setClientId(ClientId.ofRepoId(AD_Client_ID))
 				.setDocumentRef(TableRecordReference.of(AD_Table_ID, Record_ID))
 				.setForce(force)
 				.setPostImmediate(PostImmediate.Yes)
-				.setFailOnError(true) // yes, because we will display a pop-up to user in this case (see below)
-				//
-				// Run it on UI
-				.postItOnUI()
+				.setFailOnError(true);
+
+		//
+		// Run it on UI
+		Services.get(IClientUI.class)
+				.invoke()
+				.setRunnable(postingRequestBuilder::postIt)
 				.setParentComponentByWindowNo(WindowNo)
 				.setOnFail(OnFail.ShowErrorPopup)
 				.setLongOperation(true)

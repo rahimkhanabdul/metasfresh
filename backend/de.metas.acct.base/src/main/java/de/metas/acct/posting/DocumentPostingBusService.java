@@ -4,27 +4,28 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Properties;
 
+import javax.annotation.PostConstruct;
+
 import org.adempiere.util.lang.IAutoCloseable;
-import org.compiere.Adempiere;
 import org.compiere.util.Env;
 import org.slf4j.Logger;
 import org.slf4j.MDC;
 import org.slf4j.MDC.MDCCloseable;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.DependsOn;
 import org.springframework.stereotype.Service;
+
+import com.google.common.collect.ImmutableList;
 
 import de.metas.event.Event;
 import de.metas.event.IEventBus;
 import de.metas.event.IEventBusFactory;
 import de.metas.event.IEventListener;
-import de.metas.event.SimpleObjectSerializer;
 import de.metas.event.Topic;
 import de.metas.event.log.EventLogUserService;
 import de.metas.event.log.EventLogUserService.InvokeHandlerAndLogRequest;
 import de.metas.event.remote.RabbitMQEventBusConfiguration;
 import de.metas.logging.LogManager;
 import de.metas.logging.TableRecordMDC;
+import de.metas.util.JSONObjectMapper;
 import lombok.NonNull;
 
 /*
@@ -50,28 +51,49 @@ import lombok.NonNull;
  */
 
 @Service
-@DependsOn(Adempiere.BEAN_NAME) // needs database
 public class DocumentPostingBusService
 {
 	private static final Topic TOPIC = RabbitMQEventBusConfiguration.AccountingQueueConfiguration.EVENTBUS_TOPIC;
-	private static final String PROPERTY_DocumentPostRequest = "DocumentPostRequest";
+	private static final String EVENT_PROPERTY_DocumentPostRequest = "DocumentPostRequest";
 
 	// services
 	private static final Logger logger = LogManager.getLogger(DocumentPostingBusService.class);
+	private static final JSONObjectMapper<DocumentPostRequest> jsonObjectMapper = JSONObjectMapper.forClass(DocumentPostRequest.class);
 	private final IEventBusFactory eventBusFactory;
 	private final EventLogUserService eventLogUserService;
+	private final ImmutableList<DocumentPostRequestHandler> handlers;
 
 	public DocumentPostingBusService(
 			@NonNull final IEventBusFactory eventBusFactory,
-			@NonNull final EventLogUserService eventLogUserService)
+			@NonNull final EventLogUserService eventLogUserService,
+			@NonNull final Optional<List<DocumentPostRequestHandler>> handlers)
 	{
 		this.eventBusFactory = eventBusFactory;
 		this.eventLogUserService = eventLogUserService;
+		this.handlers = handlers.map(ImmutableList::copyOf)
+				.orElseGet(ImmutableList::of);
+	}
+
+	@PostConstruct
+	private void postConstruct()
+	{
+		handlers.forEach(this::registerHandler);
+	}
+
+	private void registerHandler(@NonNull final DocumentPostRequestHandler handler)
+	{
+		final IEventBus eventBus = getEventBus();
+		eventBus.subscribe(DocumentPostRequestHandlerAsEventListener.builder()
+				.handler(handler)
+				.eventLogUserService(eventLogUserService)
+				.build());
+
+		logger.info("Registered `{}` to `{}`", handler, eventBus);
 	}
 
 	public void postRequest(@NonNull final DocumentPostRequest request)
 	{
-		final Event event = createEventFromRequest(request);
+		final Event event = toEvent(request);
 		getEventBus().postEvent(event);
 	}
 
@@ -80,42 +102,20 @@ public class DocumentPostingBusService
 		return eventBusFactory.getEventBus(TOPIC);
 	}
 
-	private Event createEventFromRequest(@NonNull final DocumentPostRequest request)
+	private static Event toEvent(@NonNull final DocumentPostRequest request)
 	{
-		final String requestStr = SimpleObjectSerializer.get().serialize(request);
+		final String requestStr = jsonObjectMapper.writeValueAsString(request);
 
 		return Event.builder()
-				.putProperty(PROPERTY_DocumentPostRequest, requestStr)
+				.putProperty(EVENT_PROPERTY_DocumentPostRequest, requestStr)
 				.shallBeLogged()
 				.build();
 	}
 
 	private static DocumentPostRequest extractDocumentPostRequest(@NonNull final Event event)
 	{
-		final String requestStr = event.getProperty(PROPERTY_DocumentPostRequest);
-
-		final DocumentPostRequest request = SimpleObjectSerializer.get()
-				.deserialize(requestStr, DocumentPostRequest.class);
-		return request;
-	}
-
-	@Autowired
-	public void registerHandlers(@NonNull final Optional<List<DocumentPostRequestHandler>> handlers)
-	{
-		if (handlers.isPresent())
-		{
-			handlers.get().forEach(this::registerHandler);
-		}
-	}
-
-	public void registerHandler(@NonNull final DocumentPostRequestHandler handler)
-	{
-		getEventBus().subscribe(DocumentPostRequestHandlerAsEventListener.builder()
-				.handler(handler)
-				.eventLogUserService(eventLogUserService)
-				.build());
-
-		logger.info("Registered handler: {}", handler);
+		final String json = event.getProperty(EVENT_PROPERTY_DocumentPostRequest);
+		return jsonObjectMapper.readValue(json);
 	}
 
 	@lombok.ToString
@@ -138,33 +138,22 @@ public class DocumentPostingBusService
 		{
 			final DocumentPostRequest request = extractDocumentPostRequest(event);
 
-			try (final IAutoCloseable ctx = switchCtx(request);
+			try (final IAutoCloseable ctxCloseable = switchCtx(request);
 					final MDCCloseable requestRecordMDC = TableRecordMDC.putTableRecordReference(request.getRecord());
 					final MDCCloseable eventHandlerMDC = MDC.putCloseable("eventHandler.className", handler.getClass().getName());)
 			{
 				eventLogUserService.invokeHandlerAndLog(InvokeHandlerAndLogRequest.builder()
 						.handlerClass(handler.getClass())
-						.invokaction(() -> handleRequest(request))
+						.invokaction(() -> handler.handleRequest(request))
 						.build());
 			}
 		}
 
-		private void handleRequest(@NonNull final DocumentPostRequest request)
-		{
-			handler.handleRequest(request);
-		}
-
-		private IAutoCloseable switchCtx(@NonNull final DocumentPostRequest request)
-		{
-			final Properties ctx = createCtx(request);
-			return Env.switchContext(ctx);
-		}
-
-		private Properties createCtx(@NonNull final DocumentPostRequest request)
+		private static IAutoCloseable switchCtx(@NonNull final DocumentPostRequest request)
 		{
 			final Properties ctx = Env.newTemporaryCtx();
 			Env.setClientId(ctx, request.getClientId());
-			return ctx;
+			return Env.switchContext(ctx);
 		}
 	}
 }
