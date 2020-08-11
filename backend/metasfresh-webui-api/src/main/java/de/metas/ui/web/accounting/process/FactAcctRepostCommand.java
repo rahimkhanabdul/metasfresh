@@ -8,11 +8,10 @@ import org.compiere.util.Env;
 
 import com.google.common.collect.ImmutableSet;
 
-import de.metas.acct.api.IPostingRequestBuilder.PostImmediate;
-import de.metas.acct.api.IPostingService;
+import de.metas.acct.posting.DocumentPostRequest;
+import de.metas.acct.posting.DocumentPostingBusService;
 import de.metas.user.UserId;
 import de.metas.util.Check;
-import de.metas.util.Services;
 import lombok.Builder;
 import lombok.NonNull;
 import lombok.Singular;
@@ -41,7 +40,7 @@ import lombok.Singular;
 
 final class FactAcctRepostCommand
 {
-	private final IPostingService postingService = Services.get(IPostingService.class);
+	private final DocumentPostingBusService postingBusService;
 
 	private final UserId loggedUserId;
 	private final boolean forcePosting;
@@ -65,10 +64,13 @@ final class FactAcctRepostCommand
 
 	@Builder
 	private FactAcctRepostCommand(
+			@NonNull final DocumentPostingBusService postingBusService,
 			final boolean forcePosting,
 			@NonNull @Singular("documentToRepost") final Set<DocumentToRepost> documentsToRepost)
 	{
 		Check.assumeNotEmpty(documentsToRepost, "documentsToRepost is not empty");
+
+		this.postingBusService = postingBusService;
 
 		this.forcePosting = forcePosting;
 		this.documentsToRepost = ImmutableSet.copyOf(documentsToRepost);
@@ -82,15 +84,12 @@ final class FactAcctRepostCommand
 
 	private void repost(final DocumentToRepost doc)
 	{
-		postingService
-				.newPostingRequest()
-				.setClientId(doc.getClientId())
-				.setDocumentRef(doc.getRecordRef())
-				.setForce(forcePosting)
-				.setPostImmediate(PostImmediate.Yes)
-				.setFailOnError(true)
-				.onErrorNotifyUser(loggedUserId)
-				.postIt();
+		postingBusService.postRequestAfterCommit(DocumentPostRequest.builder()
+				.record(doc.getRecordRef())
+				.clientId(doc.getClientId())
+				.force(forcePosting)
+				.onErrorNotifyUserId(loggedUserId)
+				.build());
 	}
 
 }

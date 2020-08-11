@@ -38,22 +38,23 @@ import org.compiere.model.ModelValidator;
 import org.compiere.model.X_C_DocType;
 
 import de.metas.acct.api.IFactAcctDAO;
-import de.metas.acct.api.IPostingService;
 import de.metas.acct.doc.DocLine_Invoice;
+import de.metas.acct.posting.DocumentPostRequest;
+import de.metas.acct.posting.DocumentPostingBusService;
 import de.metas.user.UserId;
 import lombok.NonNull;
 
 @Interceptor(I_M_MatchInv.class)
 public class M_MatchInv
 {
-	private final IPostingService postingService;
+	private final DocumentPostingBusService postingBusService;
 	private final IFactAcctDAO factAcctDAO;
 
 	public M_MatchInv(
-			@NonNull final IPostingService postingService,
+			@NonNull final DocumentPostingBusService postingBusService,
 			@NonNull final IFactAcctDAO factAcctDAO)
 	{
-		this.postingService = postingService;
+		this.postingBusService = postingBusService;
 		this.factAcctDAO = factAcctDAO;
 	}
 
@@ -93,13 +94,11 @@ public class M_MatchInv
 
 	private void postIt(final I_M_MatchInv matchInv)
 	{
-		postingService.newPostingRequest()
-				.setClientId(ClientId.ofRepoId(matchInv.getAD_Client_ID()))
-				.setDocumentRef(TableRecordReference.of(matchInv))
-				.setFailOnError(false)
-				.onErrorNotifyUser(UserId.ofRepoId(matchInv.getUpdatedBy()))
-				.postIt();
-
+		postingBusService.postRequestAfterCommit(DocumentPostRequest.builder()
+				.record(TableRecordReference.of(matchInv))
+				.clientId(ClientId.ofRepoId(matchInv.getAD_Client_ID()))
+				.onErrorNotifyUserId(UserId.ofRepoId(matchInv.getUpdatedBy()))
+				.build());
 	}
 
 	private void unpostInvoiceIfNeeded(final I_M_MatchInv matchInv)

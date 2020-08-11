@@ -1,11 +1,17 @@
 package de.metas.acct.posting;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Properties;
 
 import javax.annotation.PostConstruct;
 
+import org.adempiere.ad.trx.api.ITrx;
+import org.adempiere.ad.trx.api.ITrxManager;
+import org.adempiere.ad.trx.api.OnTrxMissingPolicy;
+import org.adempiere.exceptions.AdempiereException;
+import org.adempiere.service.ISysConfigBL;
 import org.adempiere.util.lang.IAutoCloseable;
 import org.compiere.util.Env;
 import org.slf4j.Logger;
@@ -13,6 +19,7 @@ import org.slf4j.MDC;
 import org.slf4j.MDC.MDCCloseable;
 import org.springframework.stereotype.Service;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 
 import de.metas.event.Event;
@@ -26,7 +33,9 @@ import de.metas.event.remote.RabbitMQEventBusConfiguration;
 import de.metas.logging.LogManager;
 import de.metas.logging.TableRecordMDC;
 import de.metas.util.JSONObjectMapper;
+import de.metas.util.Services;
 import lombok.NonNull;
+import lombok.ToString;
 
 /*
  * #%L
@@ -51,17 +60,22 @@ import lombok.NonNull;
  */
 
 @Service
-public class DocumentPostingBusService
+public class DocumentPostingBusService implements IDocumentPostingBusService
 {
-	private static final Topic TOPIC = RabbitMQEventBusConfiguration.AccountingQueueConfiguration.EVENTBUS_TOPIC;
-	private static final String EVENT_PROPERTY_DocumentPostRequest = "DocumentPostRequest";
-
 	// services
 	private static final Logger logger = LogManager.getLogger(DocumentPostingBusService.class);
 	private static final JSONObjectMapper<DocumentPostRequest> jsonObjectMapper = JSONObjectMapper.forClass(DocumentPostRequest.class);
+	private final ITrxManager trxManager = Services.get(ITrxManager.class);
+	private final ISysConfigBL sysConfigBL = Services.get(ISysConfigBL.class);
 	private final IEventBusFactory eventBusFactory;
 	private final EventLogUserService eventLogUserService;
 	private final ImmutableList<DocumentPostRequestHandler> handlers;
+
+	private static final Topic TOPIC = RabbitMQEventBusConfiguration.AccountingQueueConfiguration.EVENTBUS_TOPIC;
+	private static final String EVENT_PROPERTY_DocumentPostRequest = "DocumentPostRequest";
+	/** Flag indicating that the whole accounting module is enabled or disabled */
+	@VisibleForTesting
+	public static final String SYSCONFIG_Enabled = "org.adempiere.acct.Enabled";
 
 	public DocumentPostingBusService(
 			@NonNull final IEventBusFactory eventBusFactory,
@@ -91,10 +105,38 @@ public class DocumentPostingBusService
 		logger.info("Registered `{}` to `{}`", handler, eventBus);
 	}
 
-	public void postRequest(@NonNull final DocumentPostRequest request)
+	/** @return true if the accounting module is active; false if the accounting module is COMPLETELLY off */
+	public boolean isEnabled()
 	{
+		final boolean defaultValue = true; // enabled by default
+		return sysConfigBL.getBooleanValue(SYSCONFIG_Enabled, defaultValue);
+	}
+
+	@Override
+	public void postRequestAfterCommit(@NonNull final DocumentPostRequest request)
+	{
+		if (!isEnabled())
+		{
+			logger.debug("Skip posting {} because accounting is not active", request);
+			return;
+		}
+
 		final Event event = toEvent(request);
-		getEventBus().postEvent(event);
+
+		final ITrx currentTrx = trxManager.getThreadInheritedTrx(OnTrxMissingPolicy.ReturnTrxNone);
+		if (trxManager.isActive(currentTrx))
+		{
+			final EventsCollector collector = currentTrx.getPropertyAndProcessAfterCommit(
+					EventsCollector.class.getName(),
+					() -> new EventsCollector(getEventBus()),
+					EventsCollector::postAllCollected);
+
+			collector.collect(event);
+		}
+		else
+		{
+			getEventBus().postEvent(event);
+		}
 	}
 
 	private IEventBus getEventBus()
@@ -117,6 +159,12 @@ public class DocumentPostingBusService
 		final String json = event.getProperty(EVENT_PROPERTY_DocumentPostRequest);
 		return jsonObjectMapper.readValue(json);
 	}
+
+	//
+	//
+	//
+	//
+	//
 
 	@lombok.ToString
 	private static final class DocumentPostRequestHandlerAsEventListener implements IEventListener
@@ -154,6 +202,41 @@ public class DocumentPostingBusService
 			final Properties ctx = Env.newTemporaryCtx();
 			Env.setClientId(ctx, request.getClientId());
 			return Env.switchContext(ctx);
+		}
+	}
+
+	//
+	//
+	//
+	//
+	//
+
+	@ToString
+	private static class EventsCollector
+	{
+		private final IEventBus eventBus;
+		private ArrayList<Event> events = new ArrayList<>();
+
+		public EventsCollector(@NonNull final IEventBus eventBus)
+		{
+			this.eventBus = eventBus;
+		}
+
+		public void collect(@NonNull final Event event)
+		{
+			if (events == null)
+			{
+				throw new AdempiereException("Events already sent");
+			}
+			events.add(event);
+		}
+
+		public void postAllCollected()
+		{
+			final ArrayList<Event> events = this.events;
+			this.events = null;
+
+			events.forEach(eventBus::postEvent);
 		}
 	}
 }

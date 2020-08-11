@@ -52,6 +52,7 @@ import org.adempiere.ad.trx.api.ITrx;
 import org.adempiere.images.Images;
 import org.adempiere.service.ClientId;
 import org.adempiere.util.lang.impl.TableRecordReference;
+import org.compiere.SpringContextHolder;
 import org.compiere.apps.form.FormFrame;
 import org.compiere.db.CConnection;
 import org.compiere.grid.ed.Calculator;
@@ -69,11 +70,8 @@ import org.compiere.util.Ini;
 import org.compiere.util.SwingUtils;
 import org.slf4j.Logger;
 
-import de.metas.acct.api.IPostingRequestBuilder;
-import de.metas.acct.api.IPostingRequestBuilder.PostImmediate;
-import de.metas.acct.api.IPostingService;
-import de.metas.adempiere.form.IClientUI;
-import de.metas.adempiere.form.IClientUIInvoker.OnFail;
+import de.metas.acct.posting.DocumentPostRequest;
+import de.metas.acct.posting.IDocumentPostingBusService;
 import de.metas.cache.CCache;
 import de.metas.document.references.RecordZoomWindowFinder;
 import de.metas.i18n.IMsgBL;
@@ -956,24 +954,15 @@ public final class AEnv
 	public static void postImmediate(final int WindowNo, final int AD_Client_ID,
 			final int AD_Table_ID, final int Record_ID, final boolean force)
 	{
-		final IPostingRequestBuilder postingRequestBuilder = Services.get(IPostingService.class)
-				.newPostingRequest()
-				.setClientId(ClientId.ofRepoId(AD_Client_ID))
-				.setDocumentRef(TableRecordReference.of(AD_Table_ID, Record_ID))
-				.setForce(force)
-				.setPostImmediate(PostImmediate.Yes)
-				.setFailOnError(true);
-
-		//
-		// Run it on UI
-		Services.get(IClientUI.class)
-				.invoke()
-				.setRunnable(postingRequestBuilder::postIt)
-				.setParentComponentByWindowNo(WindowNo)
-				.setOnFail(OnFail.ShowErrorPopup)
-				.setLongOperation(true)
-				.invoke();
-	}   // postImmediate
+		final IDocumentPostingBusService postingService = SpringContextHolder.instance.getBean(IDocumentPostingBusService.class);
+		
+		postingService.postRequestAfterCommit(DocumentPostRequest.builder()
+				.record(TableRecordReference.of(AD_Table_ID, Record_ID))
+				.clientId(ClientId.ofRepoId(AD_Client_ID))
+				.force(force)
+				.onErrorNotifyUserId(Env.getLoggedUserId())
+				.build());
+	}
 
 	/**
 	 * Update all windows after look and feel changes.

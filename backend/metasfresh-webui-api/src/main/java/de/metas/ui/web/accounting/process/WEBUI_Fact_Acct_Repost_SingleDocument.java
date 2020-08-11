@@ -15,6 +15,7 @@ import org.compiere.model.I_Fact_Acct;
 import org.compiere.util.DB;
 
 import de.metas.acct.api.IFactAcctDAO;
+import de.metas.acct.posting.DocumentPostingBusService;
 import de.metas.document.engine.DocStatus;
 import de.metas.i18n.BooleanWithReason;
 import de.metas.process.IProcessPrecondition;
@@ -61,6 +62,7 @@ public class WEBUI_Fact_Acct_Repost_SingleDocument extends JavaProcess implement
 	private boolean forcePosting;
 
 	private final DocumentCollection documentsCollection = SpringContextHolder.instance.getBean(DocumentCollection.class);
+	private final DocumentPostingBusService postingBusService = SpringContextHolder.instance.getBean(DocumentPostingBusService.class);
 
 	@Override
 	public ProcessPreconditionsResolution checkPreconditionsApplicable(IProcessPreconditionsContext context)
@@ -89,8 +91,11 @@ public class WEBUI_Fact_Acct_Repost_SingleDocument extends JavaProcess implement
 	{
 		final DocumentToRepost documentToRepost = getDocumentToRepost();
 		FactAcctRepostCommand.builder()
+				.postingBusService(postingBusService)
+				//
 				.forcePosting(forcePosting)
 				.documentToRepost(documentToRepost)
+				//
 				.build()
 				.execute();
 

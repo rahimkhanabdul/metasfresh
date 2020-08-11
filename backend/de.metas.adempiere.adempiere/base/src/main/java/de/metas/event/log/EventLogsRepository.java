@@ -130,7 +130,7 @@ public class EventLogsRepository
 			pstmt = DB.prepareStatement(sql, ITrx.TRXNAME_None);
 
 			final ZonedDateTime timestamp = SystemTime.asZonedDateTime();
-			final UserId userId = Env.getLoggedUserIdIfExists().orElse(null);
+			final UserId userId = Env.getLoggedUserIdIfExists().orElse(UserId.SYSTEM);
 
 			for (final EventLogEntry logEntry : logEntries)
 			{

@@ -8,7 +8,6 @@ import javax.annotation.Nullable;
 import org.adempiere.ad.trx.api.ITrxManager;
 import org.adempiere.service.ClientId;
 import org.adempiere.service.ISysConfigBL;
-import org.adempiere.util.lang.impl.TableRecordReference;
 import org.compiere.model.I_C_UOM;
 import org.compiere.model.I_M_Product;
 import org.compiere.model.MAccount;
@@ -22,8 +21,6 @@ import de.metas.acct.api.AcctSchemaId;
 import de.metas.acct.api.IAccountDAO;
 import de.metas.acct.api.IFactAcctDAO;
 import de.metas.acct.api.IFactAcctListenersService;
-import de.metas.acct.api.IPostingRequestBuilder.PostImmediate;
-import de.metas.acct.api.IPostingService;
 import de.metas.acct.api.IProductAcctDAO;
 import de.metas.acct.api.ProductAcctType;
 import de.metas.acct.tax.ITaxAcctBL;
@@ -96,7 +93,6 @@ public class AcctDocRequiredServicesFacade
 	private final IErrorManager errorManager = Services.get(IErrorManager.class);
 
 	private final IFactAcctListenersService factAcctListenersService = Services.get(IFactAcctListenersService.class);
-	private final IPostingService postingService = Services.get(IPostingService.class);
 	private final IModelCacheInvalidationService modelCacheInvalidationService = Services.get(IModelCacheInvalidationService.class);
 
 	private final IFactAcctDAO factAcctDAO = Services.get(IFactAcctDAO.class);
@@ -201,21 +197,6 @@ public class AcctDocRequiredServicesFacade
 	public BankAccountAcct getBankAccountAcct(final BankAccountId bankAccountId, final AcctSchemaId acctSchemaId)
 	{
 		return bankAccountService.getBankAccountAcct(bankAccountId, acctSchemaId);
-	}
-
-	public void postImmediateNoFail(
-			@NonNull final TableRecordReference documentRef,
-			@NonNull final ClientId clientId)
-	{
-		postingService.newPostingRequest()
-				.setClientId(clientId)
-				.setDocumentRef(documentRef)
-				.setFailOnError(false) // don't fail because we don't want to fail the main document posting because one of it's depending documents are failing
-				.setPostImmediate(PostImmediate.Yes) // yes, post it immediate
-				.setForce(false) // don't force it
-				.setPostWithoutServer() // post directly (don't contact the server) because we want to post on client or server like the main document
-				.postIt(); // do it!
-
 	}
 
 	public I_M_Product getProductById(@NonNull final ProductId productId)

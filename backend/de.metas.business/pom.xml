@@ -33,6 +33,12 @@
 			<classifier>tests</classifier>
 			<scope>test</scope>
 		</dependency>
+		
+		<dependency>
+			<groupId>de.metas.acct</groupId>
+			<artifactId>de.metas.acct.api</artifactId>
+			<version>${metasfresh.version}</version>
+		</dependency>
 
 		<dependency>
 			<groupId>de.metas.async</groupId>

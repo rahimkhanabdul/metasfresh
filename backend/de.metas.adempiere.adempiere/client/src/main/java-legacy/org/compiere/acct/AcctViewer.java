@@ -75,7 +75,6 @@ import de.metas.acct.api.AcctSchemaElement;
 import de.metas.acct.api.AcctSchemaElementType;
 import de.metas.acct.api.AcctSchemaElementsMap;
 import de.metas.acct.api.ChartOfAccountsId;
-import de.metas.acct.api.IPostingService;
 import de.metas.adempiere.form.IClientUI;
 import de.metas.i18n.IMsgBL;
 import de.metas.logging.LogManager;
@@ -623,7 +622,8 @@ public class AcctViewer extends CFrame
 
 		final boolean isPost = m_data.isDocumentQuery()
 				&& tabbedPane.getSelectedIndex() == 1
-				&& Services.get(IPostingService.class).isEnabled();
+				//&& Services.get(IPostingService.class).isEnabled()
+				;
 		bRePost.setVisible(isPost);
 		if (Ini.isPropertyBool(Ini.P_SHOW_ADVANCED))
 		{

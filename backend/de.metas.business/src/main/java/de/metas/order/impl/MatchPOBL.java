@@ -13,13 +13,13 @@ import org.adempiere.ad.trx.api.ITrx;
 import org.adempiere.model.InterfaceWrapperHelper;
 import org.adempiere.service.ClientId;
 import org.adempiere.util.lang.impl.TableRecordReference;
+import org.compiere.SpringContextHolder;
 import org.compiere.model.I_C_InvoiceLine;
 import org.compiere.model.I_M_InOutLine;
 import org.compiere.model.I_M_MatchPO;
-import org.compiere.util.Env;
 
-import de.metas.acct.api.IPostingRequestBuilder.PostImmediate;
-import de.metas.acct.api.IPostingService;
+import de.metas.acct.posting.DocumentPostRequest;
+import de.metas.acct.posting.IDocumentPostingBusService;
 import de.metas.order.IMatchPOBL;
 import de.metas.order.IMatchPODAO;
 import de.metas.order.OrderLineId;
@@ -57,14 +57,17 @@ public class MatchPOBL implements IMatchPOBL
 			final Timestamp dateTrx,
 			final BigDecimal qty)
 	{
+		ClientId clientId = null;
 		OrderLineId orderLineId = null;
 		if (iLine != null)
 		{
 			orderLineId = OrderLineId.ofRepoIdOrNull(iLine.getC_OrderLine_ID());
+			clientId = ClientId.ofRepoId(iLine.getAD_Client_ID());
 		}
 		if (receiptLine != null)
 		{
 			orderLineId = OrderLineId.ofRepoIdOrNull(receiptLine.getC_OrderLine_ID());
+			clientId = ClientId.ofRepoId(receiptLine.getAD_Client_ID());
 		}
 
 		I_M_MatchPO retValue = null;
@@ -188,7 +191,7 @@ public class MatchPOBL implements IMatchPOBL
 			{
 				matchPOIdsToPost.add(retValue.getM_MatchPO_ID());
 			}
-			enqueToPost(matchPOIdsToPost);
+			enqueToPost(matchPOIdsToPost, clientId);
 		}
 
 		return retValue;
@@ -233,22 +236,23 @@ public class MatchPOBL implements IMatchPOBL
 		return matchPO;
 	}	// MMatchPO
 
-	private void enqueToPost(@NonNull final Set<Integer> matchPOIds)
+	private void enqueToPost(
+			@NonNull final Set<Integer> matchPOIds,
+			@NonNull final ClientId clientId)
 	{
 		if (matchPOIds.isEmpty())
 		{
 			return;
 		}
 
-		final IPostingService postingService = Services.get(IPostingService.class);
-		final ClientId clientId = ClientId.ofRepoId(Env.getAD_Client_ID());
+		final IDocumentPostingBusService postingService = SpringContextHolder.instance.getBean(IDocumentPostingBusService.class);
 
-		matchPOIds.forEach(matchPOId -> postingService.newPostingRequest()
-				.setClientId(clientId)
-				.setDocumentRef(TableRecordReference.of(I_M_MatchPO.Table_Name, matchPOId)) // the document to be posted
-				.setFailOnError(false) // don't fail because we don't want to fail the main document posting because one of it's depending documents are failing
-				.setPostImmediate(PostImmediate.No) // no, just enqueue it
-				.setForce(false) // don't force it
-				.postIt());
+		matchPOIds.stream()
+				.map(matchPOId -> DocumentPostRequest.builder()
+						.record(TableRecordReference.of(I_M_MatchPO.Table_Name, matchPOId)) // the document to be posted
+						.clientId(clientId)
+						.force(false) // don't force it
+						.build())
+				.forEach(postingService::postRequestAfterCommit);
 	}
 }

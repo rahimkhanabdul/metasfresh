@@ -71,10 +71,8 @@ import org.compiere.util.ValueNamePair;
 import org.slf4j.Logger;
 
 import ch.qos.logback.classic.Level;
-import de.metas.acct.api.IPostingService;
 import de.metas.i18n.IMsgBL;
 import de.metas.logging.LogManager;
-import de.metas.security.IUserRolePermissions;
 import de.metas.user.UserId;
 import de.metas.util.Services;
 
@@ -138,7 +136,6 @@ public final class Preference extends CDialog
 	private CCheckBox logMigrationScript = new CCheckBox();
 	private CCheckBox storePassword = new CCheckBox();
 	private CCheckBox showTrl = new CCheckBox();
-	private CCheckBox showAcct = null;
 	private CCheckBox showAdvanced = new CCheckBox();
 	private CCheckBox cacheWindow = new CCheckBox();
 	private CLabel lPrinter = new CLabel();
@@ -159,14 +156,9 @@ public final class Preference extends CDialog
 	private CPanel configPanel = new CPanel();
 
 	private PLAFEditorPanel plafEditor = new PLAFEditorPanel()
-			.setOnEditUIDefaultsActionListener(new ActionListener()
-			{
-				@Override
-				public void actionPerformed(ActionEvent e)
-				{
-					final Component btnEditUIDefaults = (Component)e.getSource();
-					UIDefaultsEditorDialog.createAndShow(btnEditUIDefaults);
-				}
+			.setOnEditUIDefaultsActionListener(e -> {
+				final Component btnEditUIDefaults = (Component)e.getSource();
+				UIDefaultsEditorDialog.createAndShow(btnEditUIDefaults);
 			});
 
 	/**
@@ -255,13 +247,6 @@ public final class Preference extends CDialog
 		showTrl.setText(msgBL.getMsg(Env.getCtx(), "ShowTrlTab", true));
 		showTrl.setToolTipText(msgBL.getMsg(Env.getCtx(), "ShowTrlTab", false));
 
-		if (Services.get(IPostingService.class).isEnabled())
-		{
-			showAcct = new CCheckBox();
-			showAcct.setText(msgBL.getMsg(Env.getCtx(), "ShowAcctTab", true));
-			showAcct.setToolTipText(msgBL.getMsg(Env.getCtx(), "ShowAcctTab", false));
-		}
-
 		showAdvanced.setText(msgBL.getMsg(Env.getCtx(), "ShowAdvancedTab", true));
 		showAdvanced.setToolTipText(msgBL.getMsg(Env.getCtx(), "ShowAdvancedTab", false));
 		// connectionProfileLabel.setText(Msg.getElement(Env.getCtx(), "ConnectionProfile"));
@@ -300,12 +285,6 @@ public final class Preference extends CDialog
 		CPanel windowPanel = new CPanel();
 		windowPanel.setBorder(BorderFactory.createTitledBorder(msgBL.getMsg(Env.getCtx(), "Window")));
 		windowPanel.setLayout(new GridLayout(4, 2));
-
-		if (showAcct != null)
-		{
-			windowPanel.add(showAcct);
-			showAcct.setBorder(insetBorder);
-		}
 
 		windowPanel.add(showTrl);
 		showTrl.setBorder(insetBorder);
@@ -461,11 +440,15 @@ public final class Preference extends CDialog
 	public void valueChanged(ListSelectionEvent e)
 	{
 		if (e.getValueIsAdjusting())
+		{
 			return;
+		}
 
 		String value = infoList.getSelectedValue();
 		if (value == null)
+		{
 			return;
+		}
 		int pos = value.indexOf("==");
 		if (pos == -1)
 		{
@@ -488,10 +471,13 @@ public final class Preference extends CDialog
 	public void actionPerformed(ActionEvent e)
 	{
 		if (e.getActionCommand().equals(ConfirmPanel.A_CANCEL))
+		{
 			dispose();
+		}
 		else if (e.getActionCommand().equals(ConfirmPanel.A_OK))
+		{
 			cmd_save();
-		//
+		}
 		else if (e.getSource() == bRoleInfo)
 		{
 			final String roleInfo = Env.getUserRolePermissions().toStringX();
@@ -544,20 +530,6 @@ public final class Preference extends CDialog
 		autoLogin.setSelected(Ini.isPropertyBool(Ini.P_A_LOGIN));
 		// Save Password
 		storePassword.setSelected(Ini.isPropertyBool(Ini.P_STORE_PWD));
-
-		// Show Acct Tab
-		if (showAcct != null)
-		{
-			if (Env.getUserRolePermissions().hasPermission(IUserRolePermissions.PERMISSION_ShowAcct))
-			{
-				showAcct.setSelected(Ini.isPropertyBool(Ini.P_SHOW_ACCT));
-			}
-			else
-			{
-				showAcct.setSelected(false);
-				showAcct.setReadWrite(false);
-			}
-		}
 
 		// Show Trl/Advanced Tab
 		showTrl.setSelected(Ini.isPropertyBool(Ini.P_SHOW_TRL));
@@ -659,13 +631,6 @@ public final class Preference extends CDialog
 		// Save Password
 		Ini.setProperty(Ini.P_STORE_PWD, (storePassword.isSelected()));
 
-		// Show Acct Tab
-		if (showAcct != null)
-		{
-			Ini.setProperty(Ini.P_SHOW_ACCT, (showAcct.isSelected()));
-			Env.setContext(Env.getCtx(), Env.CTXNAME_ShowAcct, (showAcct.isSelected()));
-		}
-
 		// Show Trl Tab
 		Ini.setProperty(Ini.P_SHOW_TRL, (showTrl.isSelected()));
 		Env.setContext(Env.getCtx(), "#ShowTrl", (showTrl.isSelected()));
@@ -713,7 +678,9 @@ public final class Preference extends CDialog
 		// Date (remove seconds)
 		java.sql.Timestamp ts = fDate.getValue();
 		if (ts != null)
+		{
 			Env.setContext(Env.getCtx(), Env.CTXNAME_Date, ts);
+		}
 		// Charset
 		Charset charset = fCharset.getSelectedItem();
 		Ini.setProperty(Ini.P_CHARSET, charset.name());

@@ -8,8 +8,8 @@ import org.slf4j.Logger;
 
 import com.google.common.base.Stopwatch;
 
-import de.metas.acct.api.IPostingRequestBuilder.PostImmediate;
-import de.metas.acct.api.IPostingService;
+import de.metas.acct.posting.DocumentPostRequest;
+import de.metas.acct.posting.DocumentPostingBusService;
 import de.metas.logging.LogManager;
 import lombok.Builder;
 import lombok.NonNull;
@@ -40,7 +40,7 @@ public final class AccoutingDocsToRepostDBTableWatcher implements Runnable
 {
 	private static final Logger logger = LogManager.getLogger(AccoutingDocsToRepostDBTableWatcher.class);
 	private final ISysConfigBL sysConfigBL;
-	private final IPostingService postingService;
+	private final DocumentPostingBusService postingBusService;
 	private final AccoutingDocsToRepostDBTableRepository accoutingDocsToRepostDBTableRepository;
 
 	private static final int RETRIEVE_CHUNK_SIZE = 100;
@@ -50,10 +50,10 @@ public final class AccoutingDocsToRepostDBTableWatcher implements Runnable
 	@Builder
 	private AccoutingDocsToRepostDBTableWatcher(
 			@NonNull final ISysConfigBL sysConfigBL,
-			@NonNull final IPostingService postingService)
+			@NonNull final DocumentPostingBusService postingBusService)
 	{
 		this.sysConfigBL = sysConfigBL;
-		this.postingService = postingService;
+		this.postingBusService = postingBusService;
 		this.accoutingDocsToRepostDBTableRepository = new AccoutingDocsToRepostDBTableRepository();
 	}
 
@@ -115,14 +115,12 @@ public final class AccoutingDocsToRepostDBTableWatcher implements Runnable
 	{
 		try
 		{
-			postingService.newPostingRequest()
-					.setClientId(docToRepost.getClientId())
-					.setDocumentRef(docToRepost.getRecordRef())
-					.setForce(docToRepost.isForce())
-					.setFailOnError(false) // don't fail because we don't want to fail this thread
-					.onErrorNotifyUser(docToRepost.getOnErrorNotifyUserId())
-					.setPostImmediate(PostImmediate.No) // no, just enqueue it
-					.postIt();
+			postingBusService.postRequestAfterCommit(DocumentPostRequest.builder()
+					.record(docToRepost.getRecordRef())
+					.clientId(docToRepost.getClientId())
+					.force(docToRepost.isForce())
+					.onErrorNotifyUserId(docToRepost.getOnErrorNotifyUserId())
+					.build());
 		}
 		catch (Exception ex)
 		{

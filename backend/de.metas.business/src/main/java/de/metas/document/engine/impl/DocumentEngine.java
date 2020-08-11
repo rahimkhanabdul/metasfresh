@@ -48,6 +48,7 @@ import java.util.Set;
 
 import org.adempiere.model.InterfaceWrapperHelper;
 import org.adempiere.service.ClientId;
+import org.compiere.SpringContextHolder;
 import org.compiere.model.I_C_Order;
 import org.slf4j.Logger;
 
@@ -55,8 +56,8 @@ import com.google.common.base.MoreObjects;
 import com.google.common.collect.ImmutableSet;
 
 import de.metas.acct.api.IFactAcctDAO;
-import de.metas.acct.api.IPostingRequestBuilder.PostImmediate;
-import de.metas.acct.api.IPostingService;
+import de.metas.acct.posting.DocumentPostRequest;
+import de.metas.acct.posting.IDocumentPostingBusService;
 import de.metas.document.engine.IDocument;
 import de.metas.lock.api.ILock;
 import de.metas.lock.api.ILockAutoCloseable;
@@ -81,10 +82,10 @@ import lombok.NonNull;
 	}
 
 	// services
-	private static final transient Logger logger = LogManager.getLogger(DocumentEngine.class);
-	private final transient ILockManager lockManager = Services.get(ILockManager.class);
-	private final transient IPostingService postingService = Services.get(IPostingService.class);
-	private final transient IFactAcctDAO factAcctDAO = Services.get(IFactAcctDAO.class);
+	private static final Logger logger = LogManager.getLogger(DocumentEngine.class);
+	private final ILockManager lockManager = Services.get(ILockManager.class);
+	private final IDocumentPostingBusService postingService = SpringContextHolder.instance.getBean(IDocumentPostingBusService.class);
+	private final IFactAcctDAO factAcctDAO = Services.get(IFactAcctDAO.class);
 
 	private final IDocument _document;
 	private String _docStatus;
@@ -279,7 +280,7 @@ import lombok.NonNull;
 			// Post it if applies
 			if (STATUS_Completed.equals(status))
 			{
-				postIt(PostImmediate.IfConfigured);
+				postIt();
 			}
 
 			return STATUS_Completed.equals(status)
@@ -314,7 +315,7 @@ import lombok.NonNull;
 		}
 		if (ACTION_Post.equals(docAction))
 		{
-			postIt(PostImmediate.Yes);
+			postIt();
 			return true; // return true because the posting request was enqueued
 		}
 		//
@@ -448,7 +449,7 @@ import lombok.NonNull;
 	/**
 	 * Post Document Does not change status
 	 */
-	private final void postIt(final PostImmediate postImmediate)
+	private final void postIt()
 	{
 		// Make sure the Post action is supported by this document
 		if (!isValidDocAction(ACTION_Post))
@@ -460,14 +461,11 @@ import lombok.NonNull;
 		final IDocument document = getDocument();
 		InterfaceWrapperHelper.save(document);
 
-		postingService
-				.newPostingRequest()
-				.setClientId(ClientId.ofRepoId(document.getAD_Client_ID()))
-				.setDocumentRef(document.toTableRecordReference())
-				.setForce(true)
-				.setPostImmediate(postImmediate)
-				.setFailOnError(false) // backward compatibility
-				.postIt();
+		postingService.postRequestAfterCommit(DocumentPostRequest.builder()
+				.record(document.toTableRecordReference())
+				.clientId(ClientId.ofRepoId(document.getAD_Client_ID()))
+				.force(true)
+				.build());
 	}	// postIt
 
 	/**

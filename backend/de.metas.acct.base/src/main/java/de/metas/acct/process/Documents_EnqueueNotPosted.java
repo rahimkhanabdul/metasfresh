@@ -6,17 +6,15 @@ import java.sql.SQLException;
 
 import org.adempiere.ad.trx.api.ITrx;
 import org.adempiere.model.InterfaceWrapperHelper;
-import org.adempiere.service.ClientId;
 import org.adempiere.util.lang.impl.TableRecordReference;
-import org.compiere.Adempiere;
+import org.compiere.SpringContextHolder;
 import org.compiere.util.DB;
 
-import de.metas.acct.api.IPostingRequestBuilder.PostImmediate;
 import de.metas.acct.doc.AcctDocRegistry;
-import de.metas.acct.api.IPostingService;
+import de.metas.acct.posting.DocumentPostRequest;
+import de.metas.acct.posting.DocumentPostingBusService;
 import de.metas.process.JavaProcess;
 import de.metas.process.RunOutOfTrx;
-import de.metas.util.Services;
 
 /*
  * #%L
@@ -42,8 +40,8 @@ import de.metas.util.Services;
 
 public class Documents_EnqueueNotPosted extends JavaProcess
 {
-	private final transient AcctDocRegistry docFactory = Adempiere.getBean(AcctDocRegistry.class);
-	private final transient IPostingService postingService = Services.get(IPostingService.class);
+	private final transient AcctDocRegistry docFactory = SpringContextHolder.instance.getBean(AcctDocRegistry.class);
+	private final transient DocumentPostingBusService postingService = SpringContextHolder.instance.getBean(DocumentPostingBusService.class);
 
 	@Override
 	@RunOutOfTrx
@@ -64,7 +62,7 @@ public class Documents_EnqueueNotPosted extends JavaProcess
 		final String sql = new StringBuilder("")
 				.append("SELECT ").append(keyColumnName)
 				.append(" FROM ").append(docTableName)
-				.append(" WHERE AD_Client_ID=").append(getAD_Client_ID())
+				.append(" WHERE AD_Client_ID=").append(getClientId().getRepoId())
 				.append(" AND Processed='Y' AND Posted='N' AND IsActive='Y'")
 				.append(" ORDER BY Created")
 				.toString();
@@ -108,13 +106,11 @@ public class Documents_EnqueueNotPosted extends JavaProcess
 
 	private void enqueueDocument(final String tableName, final int recordId)
 	{
-		postingService.newPostingRequest()
-				// Post it in same context and transaction as the process
-				.setClientId(ClientId.ofRepoId(getAD_Client_ID()))
-				.setDocumentRef(TableRecordReference.of(tableName, recordId)) // the document to be posted
-				.setFailOnError(false) // don't fail because we don't want to fail the main document posting because one of it's depending documents are failing
-				.setPostImmediate(PostImmediate.No) // no, just enqueue it
-				.setForce(false) // don't force it
-				.postIt();
+		// Post it in same context and transaction as the process
+		postingService.postRequestAfterCommit(DocumentPostRequest.builder()
+				.record(TableRecordReference.of(tableName, recordId)) // the document to be posted
+				.clientId(getClientId())
+				.force(false) // don't force it
+				.build());
 	}
 }

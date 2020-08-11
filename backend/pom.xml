@@ -78,6 +78,7 @@
 		<module>de.metas.adempiere.libero.libero</module>
 		<module>de.metas.adempiere.libero.liberoHR</module>
 
+		<module>de.metas.acct.api</module>
 		<module>de.metas.acct.base</module>
 
 		<module>de.metas.async</module>

@@ -28,10 +28,10 @@ import de.metas.acct.api.IAccountBL;
 import de.metas.acct.api.IAcctSchemaDAO;
 import de.metas.acct.api.IFactAcctDAO;
 import de.metas.acct.api.IFactAcctListenersService;
-import de.metas.acct.api.IPostingService;
 import de.metas.acct.api.IProductAcctDAO;
 import de.metas.acct.impexp.AccountImportProcess;
 import de.metas.acct.model.I_C_VAT_Code;
+import de.metas.acct.posting.DocumentPostingBusService;
 import de.metas.acct.posting.IDocumentRepostingSupplierService;
 import de.metas.acct.posting.server.accouting_docs_to_repost_db_table.AccoutingDocsToRepostDBTableWatcher;
 import de.metas.acct.spi.impl.AllocationHdrDocumentRepostingSupplier;
@@ -60,7 +60,7 @@ public class AcctModuleInterceptor extends AbstractModuleInterceptor
 {
 	private static final transient Logger logger = LogManager.getLogger(AcctModuleInterceptor.class);
 	private final IFactAcctListenersService factAcctListenersService = Services.get(IFactAcctListenersService.class);
-	private final IPostingService postingService = Services.get(IPostingService.class);
+	private final DocumentPostingBusService postingBusService;
 	private final IFactAcctDAO factAcctDAO = Services.get(IFactAcctDAO.class);
 	private final IDocumentRepostingSupplierService documentBL = Services.get(IDocumentRepostingSupplierService.class);
 	private final IImportProcessFactory importProcessFactory = Services.get(IImportProcessFactory.class);
@@ -75,9 +75,11 @@ public class AcctModuleInterceptor extends AbstractModuleInterceptor
 	private static final String CTXNAME_C_ConversionType_ID = "#" + I_C_ConversionType.COLUMNNAME_C_ConversionType_ID;
 
 	public AcctModuleInterceptor(
+			@NonNull final DocumentPostingBusService postingBusService,
 			@NonNull final ICostElementRepository costElementRepo,
 			@NonNull final TreeNodeService treeNodeService)
 	{
+		this.postingBusService = postingBusService;
 		this.costElementRepo = costElementRepo;
 		this.treeNodeService = treeNodeService;
 	}
@@ -93,7 +95,7 @@ public class AcctModuleInterceptor extends AbstractModuleInterceptor
 		documentBL.registerSupplier(new AllocationHdrDocumentRepostingSupplier());
 		documentBL.registerSupplier(new GLJournalDocumentRepostingSupplier());
 
-		if (postingService.isEnabled())
+		if (postingBusService.isEnabled())
 		{
 			userRolePermissionsDAO.setAccountingModuleActive();
 		}
@@ -132,7 +134,7 @@ public class AcctModuleInterceptor extends AbstractModuleInterceptor
 		//
 		engine.addModelValidator(new de.metas.acct.model.validator.C_TaxDeclaration());
 		//
-		engine.addModelValidator(new de.metas.acct.model.validator.M_MatchInv(postingService, factAcctDAO));
+		engine.addModelValidator(new de.metas.acct.model.validator.M_MatchInv(postingBusService, factAcctDAO));
 		//
 		engine.addModelValidator(new de.metas.acct.model.validator.GL_Distribution());
 		engine.addModelValidator(new de.metas.acct.model.validator.GL_DistributionLine());
@@ -187,6 +189,11 @@ public class AcctModuleInterceptor extends AbstractModuleInterceptor
 				logger.warn("Failed finding the default conversion type. Skip", e);
 			}
 		}
+
+		// ctx.setProperty(Env.CTXNAME_ShowAcct, postingBusService.isEnabled()
+		// && userRolePermissions.hasPermission(IUserRolePermissions.PERMISSION_ShowAcct)
+		// && Ini.isPropertyBool(Ini.P_SHOW_ACCT));
+
 	}
 
 	private void setupAccountingService()
@@ -198,7 +205,7 @@ public class AcctModuleInterceptor extends AbstractModuleInterceptor
 	{
 		final AccoutingDocsToRepostDBTableWatcher watcher = AccoutingDocsToRepostDBTableWatcher.builder()
 				.sysConfigBL(sysConfigBL)
-				.postingService(postingService)
+				.postingBusService(postingBusService)
 				.build();
 
 		final Thread thread = new Thread(watcher);

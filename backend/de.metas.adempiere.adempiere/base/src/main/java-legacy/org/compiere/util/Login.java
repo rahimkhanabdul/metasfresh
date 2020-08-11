@@ -38,7 +38,6 @@ import com.google.common.collect.ImmutableSet;
 
 import de.metas.acct.api.AcctSchema;
 import de.metas.acct.api.IAcctSchemaDAO;
-import de.metas.acct.api.IPostingService;
 import de.metas.adempiere.model.I_AD_User;
 import de.metas.adempiere.service.IPrinterRoutingBL;
 import de.metas.i18n.Language;
@@ -105,7 +104,6 @@ public class Login
 	private final transient ISystemBL systemBL = Services.get(ISystemBL.class);
 	private final transient IPrinterRoutingBL printerRoutingBL = Services.get(IPrinterRoutingBL.class);
 	private final transient ICountryDAO countriesRepo = Services.get(ICountryDAO.class);
-	private final transient IPostingService postingService = Services.get(IPostingService.class);
 	private final transient IValuePreferenceBL valuePreferenceBL = Services.get(IValuePreferenceBL.class);
 
 	//
@@ -521,9 +519,6 @@ public class Login
 		ctx.setPrinterName(printerRoutingBL.getDefaultPrinterName()); // Optional Printer
 		ctx.setAutoCommit(Ini.isPropertyBool(Ini.P_A_COMMIT));
 		ctx.setAutoNew(Ini.isPropertyBool(Ini.P_A_NEW));
-		ctx.setProperty(Env.CTXNAME_ShowAcct, postingService.isEnabled()
-				&& userRolePermissions.hasPermission(IUserRolePermissions.PERMISSION_ShowAcct)
-				&& Ini.isPropertyBool(Ini.P_SHOW_ACCT));
 		ctx.setProperty("#ShowTrl", Ini.isPropertyBool(Ini.P_SHOW_TRL));
 		ctx.setProperty("#ShowAdvanced", Ini.isPropertyBool(Ini.P_SHOW_ADVANCED));
 

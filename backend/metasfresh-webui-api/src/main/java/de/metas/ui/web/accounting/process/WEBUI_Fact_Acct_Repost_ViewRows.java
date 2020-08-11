@@ -2,22 +2,24 @@ package de.metas.ui.web.accounting.process;
 
 import java.util.Set;
 
-import de.metas.ui.web.accounting.filters.FactAcctFilterDescriptorsProviderFactory;
-import lombok.NonNull;
 import org.adempiere.ad.table.api.IADTableDAO;
 import org.adempiere.service.ClientId;
+import org.compiere.SpringContextHolder;
 import org.compiere.model.I_Fact_Acct;
 
 import com.google.common.collect.ImmutableSet;
 
+import de.metas.acct.posting.DocumentPostingBusService;
 import de.metas.process.IProcessPrecondition;
 import de.metas.process.Param;
 import de.metas.process.ProcessPreconditionsResolution;
 import de.metas.process.RunOutOfTrx;
+import de.metas.ui.web.accounting.filters.FactAcctFilterDescriptorsProviderFactory;
 import de.metas.ui.web.accounting.process.FactAcctRepostCommand.DocumentToRepost;
 import de.metas.ui.web.process.adprocess.ViewBasedProcessTemplate;
 import de.metas.ui.web.view.IViewRow;
 import de.metas.util.Services;
+import lombok.NonNull;
 
 /*
  * #%L
@@ -44,6 +46,7 @@ import de.metas.util.Services;
 public class WEBUI_Fact_Acct_Repost_ViewRows extends ViewBasedProcessTemplate implements IProcessPrecondition
 {
 	private final IADTableDAO adTablesRepo = Services.get(IADTableDAO.class);
+	private final DocumentPostingBusService postingBusService = SpringContextHolder.instance.getBean(DocumentPostingBusService.class);
 
 	public static final String TABLENAME_RV_UnPosted = "RV_UnPosted";
 
@@ -72,8 +75,11 @@ public class WEBUI_Fact_Acct_Repost_ViewRows extends ViewBasedProcessTemplate im
 		}
 
 		FactAcctRepostCommand.builder()
+				.postingBusService(postingBusService)
+				//
 				.forcePosting(forcePosting)
 				.documentsToRepost(documentsToRepost)
+				//
 				.build()
 				.execute();
 

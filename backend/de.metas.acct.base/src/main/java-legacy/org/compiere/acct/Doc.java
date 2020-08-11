@@ -65,10 +65,13 @@ import de.metas.acct.api.AcctSchemaId;
 import de.metas.acct.doc.AcctDocContext;
 import de.metas.acct.doc.AcctDocRequiredServicesFacade;
 import de.metas.acct.doc.PostingException;
+import de.metas.acct.posting.DocumentPostRequest;
+import de.metas.acct.posting.server.AccountingServer;
 import de.metas.banking.BankAccount;
 import de.metas.banking.BankAccountAcct;
 import de.metas.banking.BankAccountId;
 import de.metas.bpartner.BPartnerId;
+import de.metas.common.util.CoalesceUtil;
 import de.metas.currency.CurrencyConversionContext;
 import de.metas.currency.CurrencyPrecision;
 import de.metas.currency.ICurrencyDAO;
@@ -88,7 +91,6 @@ import de.metas.product.acct.api.ActivityId;
 import de.metas.user.UserId;
 import de.metas.util.Check;
 import de.metas.util.NumberUtils;
-import de.metas.common.util.CoalesceUtil;
 import de.metas.util.lang.RepoIdAware;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -162,6 +164,7 @@ public abstract class Doc<DocLineType extends DocLine<?>>
 
 	@Getter(AccessLevel.PROTECTED)
 	protected final AcctDocRequiredServicesFacade services;
+	private AccountingServer accountingServer;
 
 	/** AR Invoices - ARI */
 	public static final String DOCTYPE_ARInvoice = X_C_DocType.DOCBASETYPE_ARInvoice;
@@ -1942,7 +1945,25 @@ public abstract class Doc<DocLineType extends DocLine<?>>
 		for (final ID documentId : documentIds)
 		{
 			final TableRecordReference documentRef = TableRecordReference.of(tableName, documentId);
-			services.postImmediateNoFail(documentRef, clientId);
+
+			try
+			{
+				accountingServer.handleRequest(DocumentPostRequest.builder()
+						.record(documentRef)
+						.clientId(clientId)
+						.force(false) // don't force it
+						.build());
+			}
+			catch (Exception ex)
+			{
+				// don't fail because we don't want to fail the main document posting because one of it's depending documents are failing
+				log.warn("Failed posting dependent document: {}", documentRef, ex);
+			}
 		}
+	}
+
+	public void setAccountingServer(final AccountingServer accountingServer)
+	{
+		this.accountingServer = accountingServer;
 	}
 }   // Doc

@@ -6,10 +6,11 @@ import java.util.List;
 
 import org.adempiere.service.ClientId;
 import org.adempiere.util.lang.impl.TableRecordReference;
+import org.compiere.SpringContextHolder;
 import org.compiere.util.TimeUtil;
 
-import de.metas.acct.api.IPostingRequestBuilder.PostImmediate;
-import de.metas.acct.api.IPostingService;
+import de.metas.acct.posting.DocumentPostRequest;
+import de.metas.acct.posting.IDocumentPostingBusService;
 import de.metas.acct.posting.IDocumentRepostingSupplierService;
 import de.metas.document.engine.IDocument;
 import de.metas.process.JavaProcess;
@@ -42,18 +43,20 @@ import de.metas.util.time.SystemTime;
  */
 
 /**
- * The documents (created one day before) that were marked as posted but have no fact accounts will be reposted by this process
+ * The documents (created one day before) that were marked as posted but have no fact accounts will be enqueued to be reposted by this process
  *
  * @author metas-dev <dev@metasfresh.com>
  *
  */
 public class Documents_FactAcct_Creation_For_Posted extends JavaProcess
 {
+	private final IDocumentPostingBusService postingService = SpringContextHolder.instance.getBean(IDocumentPostingBusService.class);
+	
 	@Param(parameterName = "DateStart")
 	private Date p_Date;
 
 	@Override
-	protected String doIt() throws Exception
+	protected String doIt()
 	{
 		// this process is posting documents that were created one day before the process runs
 		final Timestamp startTime;
@@ -79,8 +82,6 @@ public class Documents_FactAcct_Creation_For_Posted extends JavaProcess
 
 		final ILoggable loggable = Loggables.get();
 
-		final IPostingService postingService = Services.get(IPostingService.class);
-
 		for (final IDocument document : documentsPostedNoFacts)
 		{
 			final ClientId clientId = ClientId.ofRepoId(document.getAD_Client_ID());
@@ -91,14 +92,11 @@ public class Documents_FactAcct_Creation_For_Posted extends JavaProcess
 			// The view de_metas_acct.Reposted_Documents is based on it.
 			loggable.addLog("Document Reposted: {}, DocumentNo = {}.", documentRef, documentNo);
 
-			postingService.newPostingRequest()
-					.setClientId(clientId)
-					.setDocumentRef(documentRef) // the document to be posted
-					.setFailOnError(false) // don't fail because we don't want to fail the main document posting because one of it's depending documents are failing
-					.setPostImmediate(PostImmediate.Yes) // yes, post it immediate
-					.setForce(false) // don't force it
-					.setPostWithoutServer() // post directly (don't contact the server) because we want to post on client or server like the main document
-					.postIt(); // do it!
+			postingService.postRequestAfterCommit(DocumentPostRequest.builder()
+					.record(documentRef) // the document to be posted
+					.clientId(clientId)
+					.force(false) // don't force it
+					.build());
 		}
 
 		return MSG_OK;

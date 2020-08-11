@@ -1,17 +1,19 @@
 package de.metas.acct.posting.server;
 
+import org.adempiere.ad.trx.api.ITrxManager;
 import org.slf4j.Logger;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 import de.metas.Profiles;
-import de.metas.acct.api.IPostingRequestBuilder.PostImmediate;
-import de.metas.acct.api.IPostingService;
+import de.metas.acct.api.IAcctSchemaDAO;
 import de.metas.acct.doc.AcctDocRegistry;
 import de.metas.acct.posting.DocumentPostRequest;
 import de.metas.acct.posting.DocumentPostRequestHandler;
 import de.metas.logging.LogManager;
+import de.metas.notification.INotificationBL;
 import de.metas.util.Services;
+import lombok.NonNull;
 
 /*
  * #%L
@@ -37,12 +39,17 @@ import de.metas.util.Services;
 
 @Component
 @Profile(Profiles.PROFILE_AccountingService)
-class AccountingServer implements DocumentPostRequestHandler
+public class AccountingServer implements DocumentPostRequestHandler
 {
 	private static final Logger logger = LogManager.getLogger(AccountingServer.class);
+	private final IAcctSchemaDAO acctSchemaDAO = Services.get(IAcctSchemaDAO.class);
+	private final INotificationBL userNotifications = Services.get(INotificationBL.class);
+	private final ITrxManager trxManager = Services.get(ITrxManager.class);
+	private final AcctDocRegistry acctDocFactory;
 
-	public AccountingServer(final AcctDocRegistry acctDocFactory)
+	public AccountingServer(@NonNull final AcctDocRegistry acctDocFactory)
 	{
+		this.acctDocFactory = acctDocFactory;
 	}
 
 	@Override
@@ -50,17 +57,14 @@ class AccountingServer implements DocumentPostRequestHandler
 	{
 		logger.debug("Posting: {}", request);
 
-		final IPostingService postingService = Services.get(IPostingService.class);
-		postingService.newPostingRequest()
-				.setClientId(request.getClientId())
-				.setDocumentRef(request.getRecord())
-				.setForce(request.isForce())
-				.setFailOnError(true)
-				.onErrorNotifyUser(request.getOnErrorNotifyUserId())
-				.setPostWithoutServer() // we are on server side now, so don't try to contact the server again
-				.setPostImmediate(PostImmediate.Yes) // make sure we are posting it immediate
+		DocumentPostRequestProcessCommand.builder()
+				.acctSchemaDAO(acctSchemaDAO)
+				.userNotifications(userNotifications)
+				.trxManager(trxManager)
+				.acctDocFactory(acctDocFactory)
 				//
-				// Execute the posting
-				.postIt();
+				.request(request)
+				//
+				.execute();
 	}
 }
