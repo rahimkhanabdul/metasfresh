@@ -1,10 +1,8 @@
-package org.eevolution.api.impl;
-
 /*
  * #%L
- * de.metas.adempiere.libero.libero
+ * de.metas.manufacturing
  * %%
- * Copyright (C) 2015 metas GmbH
+ * Copyright (C) 2020 metas GmbH
  * %%
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as
@@ -21,6 +19,8 @@ package org.eevolution.api.impl;
  * <http://www.gnu.org/licenses/gpl-2.0.html>.
  * #L%
  */
+
+package org.eevolution.api.impl;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -155,7 +155,6 @@ public class PPOrderBL implements IPPOrderBL
 
 			final I_AD_Workflow wf = order.getAD_Workflow();
 			qtyBatchSize = wf.getQtyBatchSize().setScale(0, RoundingMode.UP);
-			order.setQtyBatchSize(qtyBatchSize);
 		}
 
 		final BigDecimal qtyBatchs;
